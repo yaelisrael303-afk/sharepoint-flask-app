@@ -4,6 +4,6 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python3 app.py
+    startCommand: python app.py
     envGroups:
       - flask-email
