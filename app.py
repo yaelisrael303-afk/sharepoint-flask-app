@@ -213,6 +213,11 @@ MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני",
 # שמירת מיילים קבועים
 EMAILS_FILE = "/tmp/partner_emails.json"
 
+def get_email_credentials():
+    if not GMAIL_USER or not GMAIL_PASS:
+        raise ValueError("חסרים פרטי SMTP: יש להגדיר GMAIL_USER ו-GMAIL_PASS בסביבה")
+    return GMAIL_USER, GMAIL_PASS
+
 def load_emails():
     if os.path.exists(EMAILS_FILE):
         with open(EMAILS_FILE) as f:
@@ -305,9 +310,16 @@ def send_email(to_email, partner, label, excel_bytes, safe_name):
     part.add_header("Content-Disposition", f'attachment; filename="{safe_name}.xlsx"')
     msg.attach(part)
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(GMAIL_USER, GMAIL_PASS)
-        server.sendmail(GMAIL_USER, to_email, msg.as_string())
+    get_email_credentials()
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.sendmail(GMAIL_USER, to_email, msg.as_string())
+    except smtplib.SMTPAuthenticationError:
+        raise ValueError("שגיאת התחברות ל-Gmail SMTP: בדקי את שם המשתמש והסיסמה/סיסמת אפליקציה")
+    except Exception as e:
+        raise ValueError(f"שגיאת SMTP: {e}")
 
 # Cache קובץ בין requests
 import tempfile
@@ -376,6 +388,11 @@ def send():
             if email:
                 saved_emails[name] = email
     save_emails(saved_emails)
+
+    if any(item["email"] for item in partners_data) and (not GMAIL_USER or not GMAIL_PASS):
+        return render_template_string(HTML, months=MONTHS, partners=None, send_results=None,
+                                       selected_month=month, selected_year=year,
+                                       error="חסרים פרטי דואר: יש להגדיר GMAIL_USER ו-GMAIL_PASS ב-Render env", success=None)
 
     results = []
     zip_buf = io.BytesIO() if also_zip == "yes" else None
